@@ -1,14 +1,5 @@
 # Obsidian Tag Manager
-
-A small utility to add or remove a tag across Markdown files in an Obsidian vault (or any folder), without disturbing existing frontmatter structure. It:
-- Always uses the `tags` key (never `tag` or a custom property).
-- Writes tags as block lists:
-
-  ```yaml
-  tags:
-    - my_tag
-    - another_tag
-  ```
+A small utility to add or remove a tag across Markdown files in an Obsidian vault without disturbing existing frontmatter structure. It:
 
 - Ignores inline `#tags` in the Markdown body.
 - Can operate recursively or just on the specified folder.
@@ -17,7 +8,6 @@ A small utility to add or remove a tag across Markdown files in an Obsidian vaul
 
 ## Install & Run
 
-1. Ensure Python (Anaconda recommended) with `ruamel.yaml` available.
 2. Edit `config.py` to set your path, tag, mode, and options.
 3. Run:
 
@@ -25,7 +15,7 @@ A small utility to add or remove a tag across Markdown files in an Obsidian vaul
    python main.py
    ```
 
-   Or override via CLI:
+   Or via CLI:
 
    ```bash
    python main.py \
@@ -58,13 +48,3 @@ Uses `pytest`. From project root:
 pytest -q
 ```
 
-The test suite:
-- Covers parsing/round-trip behavior for frontmatter.
-- Verifies add/remove semantics (including deleting entire frontmatter when empty).
-- Checks recursive vs non-recursive behavior.
-- Generates a grid of initial states to ensure only the `tags` key changes on add.
-
-## Notes
-
-- We rely on `ruamel.yaml` for round-trip YAML editing to preserve formatting and comments as much as possible.
-- If you remove the last remaining tag and no other keys exist in frontmatter, we remove the entire frontmatter block.
