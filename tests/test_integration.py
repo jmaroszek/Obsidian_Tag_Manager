@@ -41,6 +41,7 @@ def test_recursive_flag_controls_depth(tmp_path):
     opts = Options(
         path=str(top),
         tag="t",
+        tags=None,
         mode="add",
         recursive=False,
         dry_run=False,
@@ -76,12 +77,13 @@ body
     )
     opts = Options(
         path=str(tmp_path),
-        tag="m",
+        tag="m",  # we are adding 'm'
+        tags=None,
         mode="add",
         recursive=True,
         dry_run=False,
         backup=False,
-        order="alpha",
+        order="alpha",  # alphabetical sort is what the assertions check
         include_glob="*.md",
         backup_dir=str(tmp_path / "Backups"),
     )
@@ -100,25 +102,27 @@ def test_backup_and_dry_run_behaviors(tmp_path, capsys):
     p.write_text("BODY\n", encoding="utf-8")
     backup_root = tmp_path / "Backups"
 
-    # Dry run: no file change, no backup anywhere
+    # Dry run: should print a diff but not change the file or create backups
     opts = Options(
         path=str(tmp_path),
-        tag="t",
+        tag="alpha",
+        tags=None,
         mode="add",
         recursive=True,
-        dry_run=True,
-        backup=True,
+        dry_run=True,  # DRY RUN FIRST
+        backup=True,  # backups enabled, but dry-run will NOT write them
         order="preserve",
         include_glob="*.md",
         backup_dir=str(backup_root),
     )
     process_path(opts)
-    assert not any(backup_root.rglob("*.bak"))
-    assert not p.read_text(encoding="utf-8").startswith("---")
+    assert not any(backup_root.rglob("*.bak"))  # no backups on dry-run
+    assert not p.read_text(encoding="utf-8").startswith("---")  # file unchanged
 
-    # Actual write with backup to centralized folder
-    opts.dry_run = False
+    # Actual write with backups to centralized folder
+    opts.dry_run = False  # now write
     process_path(opts)
+
     # backup should exist under backup_root with same relative path
     expected_backup = backup_root / "x.md.bak"
     assert expected_backup.exists()
@@ -144,6 +148,7 @@ body
     opts = Options(
         path=str(tmp_path),
         tag="alpha",
+        tags=None,
         mode="add",
         recursive=True,
         dry_run=False,

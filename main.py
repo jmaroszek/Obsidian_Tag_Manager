@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import difflib
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional, Sequence, Union
 
 from config import Settings, settings
 from fm_yaml import build_file_text, load_frontmatter, split_frontmatter
@@ -15,6 +15,7 @@ from tag_ops import add_tag, remove_tag
 class Options:
     path: str
     tag: str
+    tags: Optional[List[str]]
     mode: str  # 'add' or 'remove'
     recursive: bool
     dry_run: bool
@@ -28,6 +29,7 @@ def from_settings(cfg: Settings) -> Options:
     return Options(
         path=cfg.path,
         tag=cfg.tag,
+        tags=cfg.tags,
         mode=cfg.mode,
         recursive=cfg.recursive,
         dry_run=cfg.dry_run,
@@ -38,32 +40,44 @@ def from_settings(cfg: Settings) -> Options:
     )
 
 
-def process_file_text(text: str, tag: str, mode: str, order: str) -> str:
+# main.py
+
+
+def process_file_text(
+    text: str, tags_or_tag: Union[str, Sequence[str]], mode: str, order: str
+) -> str:
+    # Normalize to list[str]
+    if isinstance(tags_or_tag, str):
+        tags = [tags_or_tag]
+    else:
+        tags = [t for t in tags_or_tag if t is not None]
+
     yaml_text, body, nl = split_frontmatter(text)
     meta = load_frontmatter(yaml_text)
 
     if mode == "add":
-        meta, changed = add_tag(meta, tag, order)
-        if not changed and yaml_text is not None:
-            # No change in tags and FM existed -> return original
+        any_change = False
+        for t in tags:
+            meta, changed = add_tag(meta, t, order)
+            any_change = any_change or changed
+        if not any_change and yaml_text is not None:
             return text
-        # If FM didn't exist, we still add it
-        new_text = build_file_text(meta, body, nl)
-        return new_text
+        return build_file_text(meta, body, nl)
 
     elif mode == "remove":
-        meta, changed, fm_empty = remove_tag(meta, tag, order)
-        if not changed:
+        any_change = False
+        fm_empty = False
+        for i, t in enumerate(tags):
+            meta, changed, fm_empty = remove_tag(meta, t, order)
+            any_change = any_change or changed
+            # If FM emptied before finishing, remaining removes are no-ops
+            if fm_empty:
+                break
+        if not any_change:
             return text
-
         if fm_empty:
-            # Remove entire frontmatter block
-            # Ensure body has no leading blank line accidentally left
-            body_only = body.lstrip("\r\n")
-            return body_only
-        else:
-            new_text = build_file_text(meta, body, nl)
-            return new_text
+            return body.lstrip("\r\n")
+        return build_file_text(meta, body, nl)
     else:
         raise ValueError("mode must be 'add' or 'remove'")
 
@@ -77,7 +91,8 @@ def process_path(opts: Options) -> int:
     for path in iter_markdown_files(opts.path, opts.recursive, opts.include_glob):
         total += 1
         original = read_text(path)
-        updated = process_file_text(original, opts.tag, opts.mode, opts.order)
+        tags_to_use = opts.tags if opts.tags else [opts.tag]
+        updated = process_file_text(original, tags_to_use, opts.mode, opts.order)
 
         if updated != original:
             changed += 1
@@ -119,7 +134,7 @@ def parse_bool(s: Optional[str]) -> Optional[bool]:
 def main():
     parser = argparse.ArgumentParser(description="Obsidian Tag Manager")
     parser.add_argument("--path")
-    parser.add_argument("--tag")
+    parser.add_argument("--tag", action="append")
     parser.add_argument("--mode", choices=["add", "remove"])
     parser.add_argument("--recursive", choices=["true", "false"])
     parser.add_argument("--dry-run", dest="dry_run", choices=["true", "false"])
@@ -147,6 +162,13 @@ def main():
         cfg.order = args.order
     if args.include_glob is not None:
         cfg.include_glob = args.include_glob
+
+    # handle multiple tags
+    if args.tag is not None:
+        flat = []
+        for entry in args.tag:
+            flat.extend([t.strip() for t in str(entry).split(",") if t.strip()])
+        cfg.tags = flat
 
     opts = from_settings(cfg)
     process_path(opts)
