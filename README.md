@@ -8,8 +8,8 @@ A small utility to add or remove a tag across Markdown files in an Obsidian vaul
 
 ## Install & Run
 
-2. Edit `config.py` to set your path, tag, mode, and options.
-3. Run:
+Edit `config.py` to set your path, tag, mode, and options.
+Run the main script
 
    ```bash
    python main.py
